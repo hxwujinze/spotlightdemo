@@ -1,0 +1,84 @@
+
+/*content*/
+.tlinks{text-indent:-9999px;height:0;line-height:0;font-size:0;overflow:hidden;}
+.content-bg{
+	background: url('../images/bg.png');
+	padding: 3%;
+}
+.main{
+	border-top: 20px solid #BE2929;
+}
+.grid-list h4, .grid-list1 h4, .grid-list-btm h4, .grid-list-about h4, .grid-list-pic h4 {
+	color: #D02C2C;
+	text-transform: capitalize;
+	font-size: 2.0em;
+	margin-bottom: 20px;
+}
+.grid-list-main {
+	margin-bottom:10px;
+}
+.grid-list-btm{
+	float: left;
+	width:90%;
+	margin-right: 2.33%;
+}
+.grid-list-btm p{
+	font-size: 0.924em;
+	color: #555;
+	line-height: 1.8em;
+}
+.grid-list-pic{
+	float:right;
+	width:26.33%;
+}
+.grid-list-pic ul li{
+	float:left;
+	margin: 0px 20px 10px 0px;
+	width: 46.33%;
+}
+.grid-list-pic ul li:nth-child(2),.grid-list-pic ul li:nth-child(4){
+	margin-right: 0;
+}
+.grid-list-pic img{
+	border: 4px solid #ffffff;
+	box-shadow: 0px 0px 5px #999;
+}
+.para-tp{
+	margin-top:2%;
+}
+/*text1*/
+.text1 h2{
+	text-transform: capitalize;
+	font-size: 2.0em;
+	color: #555;
+}
+.text1-nav{
+	margin-top: 3%;
+}
+.text1-nav ul li{
+	display:inline;
+}
+.text1-nav ul li a{
+	display:block;
+	font-size: 0.924em;
+	color: #555;
+	letter-spacing: 0px;
+	line-height: 2.8em;
+	border-bottom: 1px solid #EEEEEE;
+}
+.text1-nav ul li:before{
+	margin-top: 12px;
+	margin-right: 10px;
+	content: url('../images/arrow.png');
+	float: left;
+}
+.text1-nav ul li a:hover{
+	color: #D02C2C;
+}
+.text-para span{
+	color: #D02C2C;
+}
+.readmore {
+	display: inline-block;
+	margin-top: 3%;
+}
