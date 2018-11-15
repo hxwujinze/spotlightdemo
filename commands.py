@@ -535,12 +535,9 @@ def test(model, args):
             pred_seq = road2["seq"]
             same = road2["same"]
          
-#        if lcs(true_seq, pred_seq) / len(true_seq) \
-#            if args.lcs else same / (L + 1) == 1.0:
-#            print(keys[0]+".png")
-#            print("true:"+mytrue_seq)
-#            print("pred:"+mypred_seq)
-#            shutil.copyfile('C:\\Users\\msi\\Desktop\\Service\\data\\melody\\'+keys[0]+".png",'C:\\Users\\msi\\Desktop\\Service\\testdata_melody2\\'+keys[0]+".png")
+        if same / (L + 1) == 1.0:
+            print(keys[0]+".png")
+            shutil.copyfile('C:\\Users\\msi\\Desktop\\Service\\data\\formula\\'+keys[0]+".png",'C:\\Users\\msi\\Desktop\\Service\\testdata_formula\\'+keys[0]+".png")
         total_acc += lcs(true_seq, pred_seq) / len(true_seq) \
             if args.lcs else same / (L + 1)
 

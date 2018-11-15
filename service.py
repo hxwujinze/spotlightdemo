@@ -223,13 +223,14 @@ class WebSocket(threading.Thread):
                                     roadseq = line['seq'].split(" ")
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
-                                        if(roadseq[i] == "blank"):
-                                            roadseq[i] == " "
+                                        if("blank" in roadseq[i]):
+                                            roadseq[i] = " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-8]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
+                                    line =line.replace(">","&gt;")
+                                    line =line.replace("blank"," ")  
                                     sendMessage('test:'+ line)
                                         
                         elif(section == '1'):
@@ -246,12 +247,13 @@ class WebSocket(threading.Thread):
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
                                         if(roadseq[i] == "blank"):
-                                            roadseq[i] == " "
+                                            roadseq[i] = " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-7]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
+                                    line =line.replace(">","&gt;")
+                                    line =line.replace("blank"," ")  
                                     sendMessage('test:'+ line)
                         elif(section == '3'):
                             subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
@@ -267,12 +269,13 @@ class WebSocket(threading.Thread):
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
                                         if(roadseq[i] == "blank"):
-                                            roadseq[i] == " "
+                                            roadseq[i] = " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-8]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
+                                    line =line.replace(">","&gt;")
+                                    line =line.replace("blank"," ")
                                     sendMessage('test:'+ line)
 #                        sendMessage("image:"+str(base64.b64encode(image.getvalue()))[2:-1])
 #返回结果

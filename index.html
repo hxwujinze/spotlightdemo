@@ -279,6 +279,7 @@ function preview(file) {
         reader.onload = function(evt) {
         	pictrue = evt.target.result;
             prevDiv.innerHTML = '<img src="' + evt.target.result + '" id="flower" class="demo092 spotlight"/>';
+        	//prevDiv.innerHTML = '<img src="1.png" id="flower" class="demo092 spotlight"/>';
         }
        reader.readAsDataURL(file.files[0]);
     
@@ -344,7 +345,7 @@ $(document).ready(function(){
         		seq = "";
         		X = 0;
                 Y = 0;
-            	player.loadFile('./b.mid', player.pause);
+            	player.loadFile('./a.mid', player.pause);
         		}
             else if(label == 'image')
             	{
@@ -420,7 +421,7 @@ if (typeof (console) === "undefined") var console = {
 				/// this sets up the MIDI.Player and gets things going...
 				player = MIDI.Player;
 				player.timeWarp = 1; // speed the song is played back
-				player.loadFile('./a.mid', player.pause);
+				player.loadFile('./b.mid', player.pause);
 				/// control the piano keys colors
 				var colorMap = MIDI.Synesthesia.map();
 				player.addListener(function(data) {
@@ -607,10 +608,10 @@ var mycode = function() {
         startRadius: 0,
         endRadius: 10,
         color: [{
-            color: 'rgba(255,150,0,0.3)',
+            color: 'rgba(255,69,0,1)',
             stop: 0
         }, {
-            color: 'rgba(123,104,238,0.6)',
+            color: 'rgba(123,104,238,0.3)',
             stop: 1
         }, ],
     });
