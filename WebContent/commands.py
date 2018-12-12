@@ -7,7 +7,7 @@ import numpy
 import torch
 import torch.nn.functional as F
 from torch.nn.utils.rnn import *
-
+import operator 
 import shutil
 
 import dataprep
@@ -389,40 +389,148 @@ def train_batched(model, args):
         except KeyboardInterrupt as e:
             save_snapshot(model, args.workspace, 'int')
             raise e
+def test(model, args):
+    r"""Test the model.
+
+    Args:
+        model (torch.nn.Module): model to be tested
+        args (namedtuple): training parameters. See :class:`~stn.run.Test`.
+
+    .. todo:
+        Use beam search.
+    """
+
+    # set model to test mode
+    model.eval()
+    torch.set_grad_enabled(False)
+
+    logging.info('model: %s, setup: %s' %
+                 (type(model).__name__, str(model.args)))
+
+    logging.info('Loading data...')
+    data, cat = dataprep.get_kdd_dataset(args.dataset, args.focus)
+    if args.split_frac > 0:
+        _, data = data.split(args.split_frac)
+
+    if args.snapshot is None:
+        epoch = load_last_snapshot(model, args.workspace)
+    else:
+        epoch = args.snapshot
+        load_snapshot(model, args.workspace, epoch)
+
+    if args.focus:
+        if args.spotlight_model == 'markov':
+            agent = MarkovPolicy(model.hidden_size + model.img_size + 3)
+        else:
+            agent = RNNPolicy(model.hidden_size + model.img_size + 3, 64)
+        load_snapshot(agent, args.workspace, args.focus)
+
+    logging.info('loaded model at epoch %s', str(epoch))
+
+    model.to(device)
+
+    N = len(data.keys)
+    n = 0
+    total_acc = 0.
+
+    for keys, item in data.shuffle().epoch(1, backend='torch'):
+        n += 1
+
+        sentence = item.y
+        L = sentence.size(1)
+
+        null = torch.zeros(1, 1).long()
+        beg = null + 1
+
+        x = torch.cat([beg, sentence], dim=1).permute(1, 0)
+        y_true = torch.cat([sentence, null], dim=1).permute(1, 0)
+        y_pred = torch.zeros(L * 2 + 21, 1).long().to(device)
+        img = item.file.to(device)
+        h, h_img, s = model.get_initial_state(img)
+
+        same = 0
+        y_ = x[0:1, :]
+
+        if args.focus:
+            sh = agent.default_h().to(device)
+            c = agent.default_c().to(device)
+
+        true_seq = []
+        pred_seq = []
+        for i in range(L * 2 + 20):
+            if args.focus:
+                h = model.get_h(y_, h)
+                c = torch.cat([h.view(1, -1), c[:, model.hidden_size:]], dim=1)
+                s, sh = agent(s, c, sh)
+                y_, h, alpha, c = model.put_h(h, h_img, s)
+            else:
+                y_, h, _, _ = model(y_, h, h_img)
+            y_ = y_.max(1)[1]
+            y_pred[i, 0] = y_
+            if i <= L:
+                true_seq.append(y_true[i, 0])
+                same += (y_ == y_true[i, 0]).item()
+            pred_seq.append(y_.item())
+            y_ = y_.unsqueeze(0)
+        total_acc += lcs(true_seq, pred_seq) / len(true_seq) \
+            if args.lcs else same / (L + 1)
+        if n % 50 == 0 or n == len(data.keys):
+            logging.info('[%d/%d] acc %.6f' %
+                         (n, N, total_acc / n))
+
+    torch.set_grad_enabled(True)
+        
+def beamroadtest(seq):
+
+    
+    
+    model = seq["param"][0]
+    agent = seq["param"][1]
+    args  = seq["param"][2]
+    x_    = seq["param"][3]
+    h_    = seq["param"][4]
+    c_    = seq["param"][5]
+    s_    = seq["param"][6]
+    sh_   = seq["param"][7]
+    h_img_ = seq["param"][8]
+    y_true = seq["param"][9]
+
+    
+    if args.focus:
+        h_ = model.get_h(x_, h_)
+        c_ = torch.cat([h_.view(1, -1), c_[:, model.hidden_size:]], dim=1)
+        s_, sh_ = agent(s_, c_, sh_)
+        y_, h_, alpha, c_ = model.put_h(h_, h_img_, s_)
+    else:
+        y_, h_, alpha, _ = model(x_, h_, h_img_)
+
+
+            
+    x = []
+    p = {}
+    q = {}
+    y = y_.numpy()[0]
+    x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]]))).unsqueeze(0))
+    x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]]))).unsqueeze(0))
+    p["seq"] = seq["seq"] + [numpy.array([numpy.argsort(y)[-1]])[0]]
+    p["weight"] = seq["weight"] + y[numpy.argsort(y)[-1]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
+    p["same"] = seq["same"] + ( torch.from_numpy(numpy.array([numpy.argsort(y)[-1]])) == y_true[len(p["seq"])-1, 0]).item()
+    p["param"]  = [model, agent,args,x[0],h_,c_,s_,sh_,h_img_,y_true]
 
         
-def beamroadtest(model, agent,args,x,seq,L,h,c,s,sh,h_img,y_true):
-    torch.set_grad_enabled(False)
-    i = 1
-    x_ = x
-    h_ = h
-    c_ = c
-    s_ = s
-    sh_ = sh
-    h_img_ = h_img
-    for _ in range(1,len(y_true)):
-        if args.focus:
-            h_ = model.get_h(x_, h_)
-            c_ = torch.cat([h_.view(1, -1), c_[:, model.hidden_size:]], dim=1)
-            s_, sh_ = agent(s_, c_, sh_)
-            y, h_, alpha, c_ = model.put_h(h_, h_img_, s_)
-        else:
-            y, h_, alpha, _ = model(x_, h_, h_img_)
-        v = y.numpy()[0]    
-        y = y.data.max(1)[1]
-        seq["seq"].append(y.numpy()[0])
-        seq["weight"] +=v[y]
+    q["seq"] = seq["seq"] + [numpy.array([numpy.argsort(y)[-2]])[0]]
+    q["weight"] = seq["weight"] +y[numpy.argsort(y)[-2]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
+    q["same"] = seq["same"] +  ( torch.from_numpy(numpy.array([numpy.argsort(y)[-2]])) == y_true[len(q["seq"])-1, 0]).item()
+    q["param"]  = [model, agent,args,x[1],h_,c_,s_,sh_,h_img_,y_true]
+    roads = []
+    roads.append(p)
+    roads.append(q)
         
-        seq["same"] +=(y == y_true[i, 0]).item()
-        if y.numpy()[0] == 0:
-            return seq
-        x_ =y.unsqueeze(0)
-        i += 1
-    return seq
+    return roads
     torch.set_grad_enabled(True)
     
 
-def test(model, args):
+def testbeam(model, args):
     r"""Test the model.
 
     Args:
@@ -466,8 +574,8 @@ def test(model, args):
     n = 0
     total_acc = 0.
     cat = dataprep.get_cat(model.args.words)
+    
     for keys, item in data.shuffle().epoch(1, backend='torch'):
-
         n += 1
         sentence = item.y
         sentence0 = item.y.numpy()[0]
@@ -490,7 +598,7 @@ def test(model, args):
 
         true_seq = []
         pred_seq = []
-
+        #初始轮
         if args.focus:
             h = model.get_h(y_, h)
             c = torch.cat([h.view(1, -1), c[:, model.hidden_size:]], dim=1)
@@ -498,54 +606,75 @@ def test(model, args):
             y_, h, alpha, c = model.put_h(h, h_img, s)
         else:
             y_, h, _, _ = model(y_, h, h_img)
-            
-
-#            y_ = y_.max(1)[1]
-            
-#            y_pred[i, 0] = y_
-#            if i <= L:
-#                true_seq.append(y_true[i, 0])
-#                same += (y_ == y_true[i, 0]).item()
-#            pred_seq.append(y_.item())
-#            if y_.numpy()[0] == 0:
-#                break
-#            y_ = y_.unsqueeze(0)
-
         y = y_.numpy()[0]
         p = {}
         q = {}
+
+        
         x = []
         x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]]))).unsqueeze(0))
-        x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]]))).unsqueeze(0))
+
         p["seq"] =[]
         p["seq"].append(numpy.array([numpy.argsort(y)[-1]])[0])
-        p["weight"] = y[numpy.argsort(y)[-1]]
+        
+        p["weight"] = y[numpy.argsort(y)[-1]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
         p["same"] =  ( torch.from_numpy(numpy.array([numpy.argsort(y)[-1]])) == y_true[0, 0]).item()
-        q = {}
-        q["seq"] =[]
-        q["seq"].append(numpy.array([numpy.argsort(y)[-2]])[0])
-        q["weight"] = y[numpy.argsort(y)[-2]]
-        q["same"] =  ( torch.from_numpy(numpy.array([numpy.argsort(y)[-2]])) == y_true[0, 0]).item()
-        road1 = beamroadtest(model, agent,args,x[0],p,L,h,c,s,sh,h_img,y_true)
-        road2 = beamroadtest(model, agent,args,x[1],q,L,h,c,s,sh,h_img,y_true)
-        if road1["weight"] > road2["weight"] or (road1["weight"] == road2["weight"] and len(road1["seq"]) < len(road2["seq"])):
-            pred_seq = road1["seq"]
-            same = road1["same"]
+        p["param"] = [model, agent,args,x[0],h,c,s,sh,h_img,y_true]
+        
+        #第一轮
+        roadstmp = beamroadtest(p)
+        result = []
+        roads = []
+        for i in range(0,2):
+            if roadstmp[i]["seq"][-1] == 0 or len(roadstmp[i]["seq"]) == L+1:
+                result.append(roadstmp[i])
+            else:
+                roads.append(roadstmp[i])
+        #后续轮
+        while len(roads) > 0:
+            k = len(roads)
+            tmp = []
+            for i in range(0,k):
+                if roads[i]["seq"][-1] != 0:
+                    road1,road2 = beamroadtest(roads[i])
+                    tmp.append(road1)
+                    tmp.append(road2)
+            tmp.sort(key=operator.itemgetter("weight"),reverse=True)
+            roads = []
+            for i in range(0,k):
+                if tmp[i]["seq"][-1] == 0 or len(tmp[i]["seq"]) == L+1:
+                    del tmp[i]["param"]
+                    result.append(tmp[i])
+                else:
+                    roads.append(tmp[i])
+
+            
+
+            
+        
+        if result[0]["weight"] > result[1]["weight"]:
+            pred_seq = result[0]["seq"]
+            same = result[0]["same"]
+
         else:
-            pred_seq = road2["seq"]
-            same = road2["same"]
-         
-        if same / (L + 1) == 1.0:
+            pred_seq =result[1]["seq"]
+            same = result[1]["same"]
+        
+#        for i in range(0,len(y_true)):
+#            true_seq.append(y_true[i, 0].item())
+            #print("road2")
+        if same / (L+1) == 1:
             print(keys[0]+".png")
             shutil.copyfile('C:\\Users\\msi\\Desktop\\Service\\data\\formula\\'+keys[0]+".png",'C:\\Users\\msi\\Desktop\\Service\\testdata_formula\\'+keys[0]+".png")
         total_acc += lcs(true_seq, pred_seq) / len(true_seq) \
-            if args.lcs else same / (L + 1)
+            if args.lcs else same / (L+1)
 
-
+        
         if n % 50 == 0 or n == len(data.keys):
             logging.info('[%d/%d] acc %.6f' %
                          (n, N, total_acc / n))
-
+    
+        
     torch.set_grad_enabled(True)
 
 
@@ -665,7 +794,7 @@ def examine(model, args):
         print()
 
     torch.set_grad_enabled(True)
-'''
+
 def visualize(model, args):
 
 
@@ -696,7 +825,7 @@ def visualize(model, args):
         sh = agent.default_h()
         c = agent.default_c()
     x = var(torch.zeros(1, 1).long() + 1)
-    import matplotlib.pyplot as plt
+#    import matplotlib.pyplot as plt
     for _ in range(40):
 
         if args.focus:
@@ -707,29 +836,29 @@ def visualize(model, args):
         else:
             y, h, alpha, _ = model(x, h, h_img)
 
-        if args.focus:
-            v = torch.zeros(3)
-            v[:] = s.squeeze().data
-            v[2:] = torch.sigmoid(v[2:])
-            v.clamp_(0, 1)
+#        if args.focus:
+#            v = torch.zeros(3)
+#            v[:] = s.squeeze().data
+#            v[2:] = torch.sigmoid(v[2:])
+#            v.clamp_(0, 1)
         y = y.data.max(1)[1]
 
         seq += cat.get_original(y)[0]
         seq += " "
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+#        fig = plt.figure()
+#        ax = fig.add_subplot(111)
 
         a = -alpha[0]
         position = numpy.where(a.data.numpy()==numpy.min(a.data.numpy()))
         radius = numpy.where(a.data.numpy()[position[0][0]]<=numpy.min(a.data.numpy()[position[0][0]])/2)
 
-        print(position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0])),cat.get_original(y)[0])
+        print(y,position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0])),cat.get_original(y)[0])
 
-        cax = ax.matshow(a.data.numpy(), cmap='RdYlBu',
-                         interpolation='gaussian')
-        fig.colorbar(cax)
-        fig.show()
-        plt.show()
+#        cax = ax.matshow(a.data.numpy(), cmap='RdYlBu',
+#                         interpolation='gaussian')
+#        fig.colorbar(cax)
+#        fig.show()
+#        plt.show()
         sys.stdout.flush()
         time.sleep(1)
         if y[0] == 0:
@@ -738,41 +867,90 @@ def visualize(model, args):
     print("test:"+seq)
     
     torch.set_grad_enabled(True)
-'''
-def beamroad(model,agent,args,x,seq,h,c,s,sh,h_img):
+    
+    
+def beamroad(seq):
+    
+    
+    
+    model = seq["param"][0]
+    agent = seq["param"][1]
+    args  = seq["param"][2]
+    x_    = seq["param"][3]
+    h_    = seq["param"][4]
+    c_    = seq["param"][5]
+    s_    = seq["param"][6]
+    sh_   = seq["param"][7]
+    h_img_ = seq["param"][8]
 
-    torch.set_grad_enabled(False)
     cat = dataprep.get_cat(model.args.words)
-    x_ = x
-    h_ = h
-    c_ = c
-    s_ = s
-    sh_ = sh
-    h_img_ = h_img
-    for _ in range(40):
+    if args.focus:
+        h_ = model.get_h(x_, h_)
+        c_ = torch.cat([h_.view(1, -1), c_[:, model.hidden_size:]], dim=1)
+        s_, sh_ = agent(s_, c_, sh_)
+        y_, h_, alpha, c_ = model.put_h(h_, h_img_, s_)
+    else:
+        y_, h_, alpha, _ = model(x_, h_, h_img_)
 
-        if args.focus:
-            h_ = model.get_h(x_, h_)
-            c_ = torch.cat([h_.view(1, -1), c_[:, model.hidden_size:]], dim=1)
-            s_, sh_ = agent(s_, c_, sh_)
-            y, h_, alpha, c_ = model.put_h(h_, h_img_, s_)
-        else:
-            y, h_, alpha, _ = model(x_, h_, h_img_)
+
+            
+    x = []
+    p = {}
+    q = {}
+    y = y_.numpy()[0]
+    v = y_.numpy()[0]
+    a = -alpha[0]
+
+    
+    
+    position = numpy.where(a.data.numpy()==numpy.min(a.data.numpy()))
+    position2 = [numpy.array([numpy.argsort(a.data.numpy(),axis = 0).T[position[1]][0][1]]),position[1]]
+
+    radius = numpy.where(a.data.numpy()[position[0][0]]<=numpy.min(a.data.numpy()[position[0][0]])/2)
+    radius2 = numpy.where(a.data.numpy()[position2[0][0]]<=a.data.numpy()[position2[0][0]][position2[1][0]]/2)
+    y = y_.numpy()[0]
+ 
+    x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]]))).unsqueeze(0))
+    x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]]))).unsqueeze(0))
+    word =cat.get_original(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]])))[0]
+    if word == "":
+        p["seq"] += "blank"
+    else:
+        p["seq"] = seq["seq"] + word
+        
+    p["weight"] = seq["weight"] + y[numpy.argsort(y)[-1]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
+    p["spot"] = seq["spot"] + [[position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0]))]]
+    p["seq"] += " "
+    p["param"]  = [model, agent,args,x[0],h_,c_,s_,sh_,h_img_]        
+
+    word =cat.get_original(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]])))[0]
+    if word == "":
+        q["seq"] += "blank"
+    else:
+        q["seq"] = seq["seq"] + word
+    q["weight"] = seq["weight"] +y[numpy.argsort(y)[-2]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
+    q["spot"] = seq["spot"] + [[position2[0][0],position2[1][0],numpy.max(abs(radius2[0] - position2[1][0]))]]
+    q["seq"] += " "
+    q["param"]  = [model, agent,args,x[1],h_,c_,s_,sh_,h_img_]    
+    roads = []
+    roads.append(p)
+    roads.append(q)
+        
+    return roads
+'''
+    
         v = y.numpy()[0]    
         y = y.data.max(1)[1]
-        a = -alpha[0]
         position = numpy.where(a.data.numpy()==numpy.min(a.data.numpy()))
         radius = numpy.where(a.data.numpy()[position[0][0]]<=numpy.min(a.data.numpy()[position[0][0]])/2)
         seq["spot"].append([position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0]))])
         seq["seq"] += cat.get_original(y)[0]
         seq["seq"] += " "
-        seq["weight"] +=v[y]
-        if y[0] == 0:
-            return seq
-        x_ = var(y).unsqueeze(0)
+
     torch.set_grad_enabled(True)
     return seq
-def visualize(model, args):
+'''
+def visualizebeam(model, args):
     model.eval()
     torch.set_grad_enabled(False)
     seq = ""
@@ -800,50 +978,71 @@ def visualize(model, args):
         sh = agent.default_h()
         c = agent.default_c()
     t = var(torch.zeros(1, 1).long() + 1)
-
-
-    allseq = []
+        
+    #初始轮
     if args.focus:
         h = model.get_h(t, h)
         c = torch.cat([h.view(1, -1), c[:, model.hidden_size:]], dim=1)
         s, sh = agent(s, c, sh)
-        y, h, alpha, c = model.put_h(h, h_img, s)
+        y_, h, alpha, c = model.put_h(h, h_img, s)
     else:
-        y, h, alpha, _ = model(t, h, h_img)
+        y_, h, alpha, _ = model(t, h, h_img)
 
-
-    a = -alpha[0]
-    position = numpy.where(a.data.numpy()==numpy.min(a.data.numpy()))
-    radius = numpy.where(a.data.numpy()[position[0][0]]<=numpy.min(a.data.numpy()[position[0][0]])/2)
-    y = y.numpy()[0]
+    y = y_.numpy()[0]
     p = {}
     q = {}
     x = []
+    a = -alpha[0]
+    position = numpy.where(a.data.numpy()==numpy.min(a.data.numpy()))
+    radius = numpy.where(a.data.numpy()[position[0][0]]<=numpy.min(a.data.numpy()[position[0][0]])/2)
     x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]]))).unsqueeze(0))
-    x.append(var(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]]))).unsqueeze(0))
     p["seq"] =cat.get_original(torch.from_numpy(numpy.array([numpy.argsort(y)[-1]])))[0]
     if p["seq"] == "":
         p["seq"] += "blank"
-    p["weight"] = y[numpy.argsort(y)[-1]]
+    p["weight"] = y[numpy.argsort(y)[-1]]/(y[numpy.argsort(y)[-1]]+abs(y[numpy.argsort(y)[0]]))
     p["spot"] = []
     p["spot"].append([position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0]))])
     p["seq"] += " "
-                
-    q = {}
-    q["seq"] =cat.get_original(torch.from_numpy(numpy.array([numpy.argsort(y)[-2]])))[0]
-    q["weight"] = y[numpy.argsort(y)[-2]]
-    q["spot"] = []
-    q["spot"].append([position[0][0],position[1][0],numpy.max(abs(radius[0] - position[1][0]))])
-    q["seq"] += " "
-    allseq.append(p)
-    allseq.append(q)
-    road1 = beamroad(model, agent,args,x[0],allseq[0],h,c,s,sh,h_img)
-    road2 = beamroad(model, agent,args,x[1],allseq[1],h,c,s,sh,h_img)
-    if road1["weight"] > road2["weight"] or (road1["weight"] == road2["weight"] and len(road1["seq"]) < len(road2["seq"])):
-        print(road1)
-    else:
-        print(road2)
+    p["param"] = [model, agent,args,x[0],h,c,s,sh,h_img]
+
+    
+    #第一轮
+    roadstmp = beamroad(p)
+    result = []
+    roads = []
+    for i in range(0,2):
+        if roadstmp[i]["seq"].split()[-1] == "<NULL>":
+            result.append(roadstmp[i])
+        else:
+            roads.append(roadstmp[i])
+    #后续轮
+    while len(roads) > 0:
+        k = len(roads)
+        tmp = []
+        for i in range(0,k):
+            road1,road2 = beamroad(roads[i])
+            tmp.append(road1)
+            tmp.append(road2)
+        tmp.sort(key=operator.itemgetter("weight"),reverse=True)
+        roads = []
+        for i in range(0,k):
+            if tmp[i]["seq"].split()[-1] == "<NULL>":
+                del tmp[i]["param"]
+                result.append(tmp[i])
+            else:
+                roads.append(tmp[i])
+
             
+
+            
+        
+    if result[0]["weight"] > result[1]["weight"]:
+        
+        print(result[0])
+
+
+    else:
+        print(result[1])
     
     torch.set_grad_enabled(True)
 

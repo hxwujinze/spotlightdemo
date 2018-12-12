@@ -12,7 +12,7 @@ from util import *
 from commands import *
 
 commands = ['config', 'train', 'batched', 'rf', 'test',
-            'examine', 'vis', 'clean', 'pretrain']
+            'examine', 'vis', 'clean', 'pretrain','testbeam','visbeam']
 models = ['Attn', 'Spotlight']
 
 
@@ -194,6 +194,33 @@ class Test:
         test(model, args)
 
 
+class Testbeam:
+    def __init__(self, parser):
+        parser.add_argument('-r', '--split_frac', type=float, default=0.9,
+                            help='train/test split fraction')
+        parser.add_argument('-s', '--snapshot',
+                            help='model snapshot to test with')
+        parser.add_argument('-d', '--dataset', help='dataset', required=True,
+                            choices=['formula', 'melody', 'multiline'])
+        parser.add_argument('-f', '--focus', help='focus module')
+        parser.add_argument('-m', '--spotlight_model', default='rnn',
+                            choices=['markov', 'rnn'],
+                            help='spotlight model')
+        parser.add_argument('--lcs', action='store_true', help='lcs')
+
+    def run(self, args):
+        for name in os.listdir(args.workspace):
+            if name.endswith('.json'):
+                Model = get_class(name.split('.')[0])
+                config = os.path.join(args.workspace, name)
+                break
+        else:
+            print('you must run config first!')
+            sys.exit(1)
+
+        model = load_config(Model, config)
+        testbeam(model, args)
+
 class Examine:
     def __init__(self, parser):
         parser.add_argument('-s', '--snapshot',
@@ -276,6 +303,36 @@ class Vis:
 
         model = load_config(Model, config)
         visualize(model, args)
+
+class Visbeam:
+    def __init__(self, parser):
+        parser.add_argument('-s', '--snapshot',
+                            help='pretrained model snapshot')
+        parser.add_argument('-i', '--input', required=True,
+                            help='input an image')
+        parser.add_argument('-f', '--focus', help='focus module')
+        parser.add_argument('-m', '--spotlight_model', default='rnn',
+                            choices=['markov', 'rnn'],
+                            help='spotlight model')
+        parser.add_argument('-W', type=int, default=256, help='width')
+        parser.add_argument('-H', type=int, default=128, help='height')
+        parser.add_argument('--agent_hs', type=int, default=128,
+                            help='agent hidden size')
+        parser.add_argument('--colored', action='store_true',
+                            help='preserve color')
+
+    def run(self, args):
+        for name in os.listdir(args.workspace):
+            if name.endswith('.json'):
+                Model = get_class(name.split('.')[0])
+                config = os.path.join(args.workspace, name)
+                break
+        else:
+            print('you must run config first!')
+            sys.exit(1)
+
+        model = load_config(Model, config)
+        visualizebeam(model, args)
 
 
 parser_formatter = argparse.ArgumentDefaultsHelpFormatter

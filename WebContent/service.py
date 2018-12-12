@@ -210,8 +210,8 @@ class WebSocket(threading.Thread):
                         section = recv_message[7]
                         if(section == '0'):
 #                            os.system("py run.py config Spotlight --words data/melody_words.txt -v resnet")
-                            subprocess.run("python3 run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("python3 run.py vis -s main.167 -m rnn -f agent.167 -i a.png --agent_hs 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
+                            subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
+                            child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i a.png --agent_hs 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
                             while child.poll() is None:
                                 line = child.stdout.readline() 
                                 line = line.strip().decode("utf-8")
@@ -219,23 +219,22 @@ class WebSocket(threading.Thread):
                                 if line:
 #返回焦点
                                     line =eval(line)
-                                    print(line)
                                     roadseq = line['seq'].split(" ")
+
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
-                                        if("blank" in roadseq[i]):
+                                        if(roadseq[i] == "blank"):
                                             roadseq[i] = " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-8]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")
-                                    line =line.replace("blank"," ")  
+                                    line =line.replace(">","&gt;")  
                                     sendMessage('test:'+ line)
                                         
                         elif(section == '1'):
-                            subprocess.run("python3 run.py config Spotlight --words data/formula_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("python3 run.py vis -s main.3 -m rnn -f agent.3 -i a.png --agent_hs 64 -W 256 -H 128",shell=True,stdout=subprocess.PIPE)
+                            subprocess.run("py run.py config Spotlight --words data/formula_words.txt -v resnet",shell=True)
+                            child = subprocess.Popen("py run.py visbeam -s main.3 -m rnn -f agent.3 -i a.png --agent_hs 64 -W 256 -H 128",shell=True,stdout=subprocess.PIPE)
                             while child.poll() is None:
                                 line = child.stdout.readline() 
                                 line = line.strip().decode("utf-8")
@@ -247,17 +246,16 @@ class WebSocket(threading.Thread):
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
                                         if(roadseq[i] == "blank"):
-                                            roadseq[i] = " "
+                                            roadseq[i] == " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-7]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")
-                                    line =line.replace("blank"," ")  
+                                    line =line.replace(">","&gt;")  
                                     sendMessage('test:'+ line)
                         elif(section == '3'):
                             subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("py run.py vis -s main.161 -m rnn -f agent.161 -i example.png --agent 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
+                            child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i example.png --agent 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
                             while child.poll() is None:
                                 line = child.stdout.readline() 
                                 line = line.strip().decode("utf-8")
@@ -269,13 +267,12 @@ class WebSocket(threading.Thread):
                                     roadspot = line["spot"]
                                     for i in range(0,len(roadspot)):
                                         if(roadseq[i] == "blank"):
-                                            roadseq[i] = " "
+                                            roadseq[i] == " "
                                         sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
                                         time.sleep(1)
                                     line =line["seq"][:-8]                                        
                                     line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")
-                                    line =line.replace("blank"," ")
+                                    line =line.replace(">","&gt;")  
                                     sendMessage('test:'+ line)
 #                        sendMessage("image:"+str(base64.b64encode(image.getvalue()))[2:-1])
 #返回结果
