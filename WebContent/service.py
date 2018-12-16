@@ -71,7 +71,7 @@ def parse_data(msg):
     return res
 
 # 调用socket的send方法发送str信息给web端
-def sendMessage(msg):
+def sendMessage(msg,Portindex):
     global connectionlist
     send_msg = b""  #使用bytes格式,避免后面拼接的时候出现异常
     send_msg += b"\x81"
@@ -92,10 +92,7 @@ def sendMessage(msg):
     else:
         print (u'太长了')
     send_message = send_msg + msg.encode('utf-8')
-
-    for connection in connectionlist.values():
-        if send_message != None and len(send_message) > 0:
-            connection.send(send_message)
+    connectionlist['connection'+str(Portindex)].send(send_message)
 
 #删除连接,从集合中删除连接对象item
 def deleteconnection(item):
@@ -166,131 +163,151 @@ class WebSocket(threading.Thread):
                     # 此处需要增加代码判断是否成功建立连接
                     self.handshaken = True #socket连接成功建立之后修改握手标志
                     #向全部连接客户端集合发送消息,(环境套接字x的到来)
-                    sendMessage("Welocomg " + self.name + " !")
                     g_code_length = 0
+                    sendMessage('index:%s'%  self.index,self.index)
                 else:
                     print("Socket %s Error2!" % (self.index))
                     deleteconnection(str(self.index))
                     self.conn.close()
                     break
             else:
-                # 每次接收128字节数据，需要判断是否接收完所有数据，如没有接收完，需要循环接收完再处理
-                mm = self.conn.recv(128)
-                #计算接受的长度，判断是否接收完，如未接受完需要继续接收
-                if g_code_length == 0:
-                    get_datalength(mm) # 调用此函数可以计算并修改全局变量g_code_length和g_header_length的值
-                self.length_buffer += len(mm)
-                self.buffer_utf8 += mm
-                if self.length_buffer - g_header_length < g_code_length:
-                    if PRINT_FLAG:
-                        print("INFO: 数据未接收完,接续接受")
-                    continue
-                else:
-                    if PRINT_FLAG:
-                        print("g_code_length:", g_code_length)
-#                        print("INFO Line 204: Recv信息 %s,长度为 %d:" % (self.buffer_utf8, len(self.buffer_utf8)))
-                    if not self.buffer_utf8:
+                try:
+                    # 每次接收128字节数据，需要判断是否接收完所有数据，如没有接收完，需要循环接收完再处理
+                    mm = self.conn.recv(128)
+                    #计算接受的长度，判断是否接收完，如未接受完需要继续接收
+                    if g_code_length == 0:
+                        get_datalength(mm) # 调用此函数可以计算并修改全局变量g_code_length和g_header_length的值
+                    self.length_buffer += len(mm)
+                    self.buffer_utf8 += mm
+                    if self.length_buffer - g_header_length < g_code_length:
+                        if PRINT_FLAG:
+                            print("INFO: 数据未接收完,接续接受")
                         continue
-                    recv_message = parse_data(self.buffer_utf8)
-                    melody = ""
-                    if recv_message == "quit":
-                        print("Socket %s Logout!" % (self.index))
-                        nowTime = time.strftime('%H:%M:%S',time.localtime(time.time()))
-#                        sendMessage("%s %s say: %s" % (nowTime, self.remote, self.name+" Logout"))
-                        deleteconnection(str(self.index))
-                        self.conn.close()
-                        break
                     else:
-                        nowTime = time.strftime('%H:%M:%S',time.localtime(time.time()))
-#                        sendMessage("%s %s say: %s" % (nowTime, self.remote, recv_message[22:]))
-                        imgdata=base64.b64decode(recv_message[31:])
-                        image = io.BytesIO(imgdata)
-                        img = Image.open(image)
-                        img.save('a.png')
-                        section = recv_message[7]
-                        if(section == '0'):
-#                            os.system("py run.py config Spotlight --words data/melody_words.txt -v resnet")
-                            subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i a.png --agent_hs 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
-                            while child.poll() is None:
-                                line = child.stdout.readline() 
-                                line = line.strip().decode("utf-8")
-                                
-                                if line:
-#返回焦点
-                                    line =eval(line)
-                                    roadseq = line['seq'].split(" ")
-
-                                    roadspot = line["spot"]
-                                    for i in range(0,len(roadspot)):
-                                        if(roadseq[i] == "blank"):
-                                            roadseq[i] = " "
-                                        sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
-                                        time.sleep(1)
-                                    line =line["seq"][:-8]                                        
-                                    line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
-                                    sendMessage('test:'+ line)
-                                        
-                        elif(section == '1'):
-                            subprocess.run("py run.py config Spotlight --words data/formula_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("py run.py visbeam -s main.3 -m rnn -f agent.3 -i a.png --agent_hs 64 -W 256 -H 128",shell=True,stdout=subprocess.PIPE)
-                            while child.poll() is None:
-                                line = child.stdout.readline() 
-                                line = line.strip().decode("utf-8")
-                                if line:
-#返回焦点
-                                    line =eval(line)
-                                    print(line)
-                                    roadseq = line['seq'].split(" ")
-                                    roadspot = line["spot"]
-                                    for i in range(0,len(roadspot)):
-                                        if(roadseq[i] == "blank"):
-                                            roadseq[i] == " "
-                                        sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
-                                        time.sleep(1)
-                                    line =line["seq"][:-7]                                        
-                                    line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
-                                    sendMessage('test:'+ line)
-                        elif(section == '3'):
-                            subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
-                            child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i example.png --agent 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
-                            while child.poll() is None:
-                                line = child.stdout.readline() 
-                                line = line.strip().decode("utf-8")
-                                if line:
-#返回焦点
-                                    line =eval(line)
-                                    print(line)
-                                    roadseq = line['seq'].split(" ")
-                                    roadspot = line["spot"]
-                                    for i in range(0,len(roadspot)):
-                                        if(roadseq[i] == "blank"):
-                                            roadseq[i] == " "
-                                        sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i])
-                                        time.sleep(1)
-                                    line =line["seq"][:-8]                                        
-                                    line =line.replace("<","&lt;")
-                                    line =line.replace(">","&gt;")  
-                                    sendMessage('test:'+ line)
-#                        sendMessage("image:"+str(base64.b64encode(image.getvalue()))[2:-1])
-#返回结果
+                        if PRINT_FLAG:
+                            print("g_code_length:", g_code_length)
+    #                        print("INFO Line 204: Recv信息 %s,长度为 %d:" % (parse_data(self.buffer_utf8), len(self.buffer_utf8)))
+                        if not self.buffer_utf8:
+                            continue
+                        recv_message = parse_data(self.buffer_utf8)
+                        melody = ""
+                        if recv_message == "quit":
+                            print("Socket %s Logout!" % (self.index))
+                            nowTime = time.strftime('%H:%M:%S',time.localtime(time.time()))
+    #                        sendMessage("%s %s say: %s" % (nowTime, self.remote, self.name+" Logout"))
+                            deleteconnection(str(self.index))
+                            self.conn.close()
+                            break
                         
-#通过命令行执行lilypond
-                    if(section == '0'):
-                        f = open("a.txt",'w',encoding='utf-8')
-                        print("\score {\\version \"2.14.2\"{"+melody+"}\midi {\context {\ScoretempoWholesPerMinute = #(ly:make-moment 72 4)}}}",file = f)
-                        f.close()
-                        if os.path.exists('a.ly'):
-                            os.remove('a.ly')
-                        os.rename('a.txt','a.ly')
-                        subprocess.run("lilypond a.ly",shell=True)
-#                    os.system("lilypond a.ly")
-#在web端载入文件即可
-                    g_code_length = 0
-                    self.length_buffer = 0
-                    self.buffer_utf8 = b""
+                        else:
+                            nowTime = time.strftime('%H:%M:%S',time.localtime(time.time()))
+    #                        sendMessage("%s %s say: %s" % (nowTime, self.remote, recv_message[22:]))
+                            control = recv_message.split("!")
+                            Portindex = control[0][6:]
+                            print(Portindex)
+                            recv_message = control[1]
+                            print(recv_message)
+                            section = recv_message[7]
+                            if(section == '0'):
+                                imgdata=base64.b64decode(recv_message[31:])
+                                image = io.BytesIO(imgdata)
+                                img = Image.open(image)
+                                img.save('a.png')
+    #                            os.system("py run.py config Spotlight --words data/melody_words.txt -v resnet")
+                                subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
+                                child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i a.png --agent_hs 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
+                                while child.poll() is None:
+                                    line = child.stdout.readline() 
+                                    line = line.strip().decode("utf-8")
+                                    
+                                    if line:
+    #返回焦点
+                                        line =eval(line)
+                                        roadseq = line['seq'].split(" ")
+
+                                        roadspot = line["spot"]
+                                        for i in range(0,len(roadspot)):
+                                            if(roadseq[i] == "blank"):
+                                                roadseq[i] = " "
+                                            sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i],Portindex)
+                                            time.sleep(1)
+                                        line =line["seq"][:-8]                                        
+                                        line =line.replace("<","&lt;")
+                                        line =line.replace(">","&gt;")
+                                        line =line.replace("blank"," ")  
+                                        sendMessage('test:'+ line,Portindex)
+                                            
+                            elif(section == '1'):
+                                imgdata=base64.b64decode(recv_message[31:])
+                                image = io.BytesIO(imgdata)
+                                img = Image.open(image)
+                                img.save('a.png')
+                                subprocess.run("py run.py config Spotlight --words data/formula_words.txt -v resnet",shell=True)
+                                child = subprocess.Popen("py run.py visbeam -s main.3 -m rnn -f agent.3 -i a.png --agent_hs 64 -W 256 -H 128",shell=True,stdout=subprocess.PIPE)
+                                while child.poll() is None:
+                                    line = child.stdout.readline() 
+                                    line = line.strip().decode("utf-8")
+                                    if line:
+    #返回焦点
+                                        line =eval(line)
+                                        print(line)
+                                        roadseq = line['seq'].split(" ")
+                                        roadspot = line["spot"]
+                                        for i in range(0,len(roadspot)):
+                                            if(roadseq[i] == "blank"):
+                                                roadseq[i] == " "
+                                            sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i],Portindex)
+                                            time.sleep(1)
+
+                                        line =line["seq"][:-7]                                        
+                                        line =line.replace("<","&lt;")
+                                        line =line.replace(">","&gt;")
+                                        line =line.replace("blank"," ")
+                                        sendMessage('test:'+ line,Portindex)
+                            elif(section == '3'):
+                                subprocess.run("py run.py config Spotlight --words data/melody_words.txt -v resnet",shell=True)
+                                child = subprocess.Popen("py run.py visbeam -s main.167 -m rnn -f agent.167 -i example.png --agent_hs 64 -W 128 -H 64",shell=True,stdout=subprocess.PIPE)
+                                while child.poll() is None:
+                                    line = child.stdout.readline() 
+                                    line = line.strip().decode("utf-8")
+                                    if line:
+    #返回焦点
+                                        line =eval(line)
+                                        print(line)
+                                        roadseq = line['seq'].split(" ")
+                                        roadspot = line["spot"]
+                                        for i in range(0,len(roadspot)):
+                                            if(roadseq[i] == "blank"):
+                                                roadseq[i] = " "
+                                            sendMessage("image:"+str(roadspot[i][0])+","+str(roadspot[i][1])+","+str(roadspot[i][2])+","+roadseq[i],Portindex)
+                                            time.sleep(1)
+                                        line =line["seq"][:-8]                                        
+                                        line =line.replace("<","&lt;")
+                                        line =line.replace(">","&gt;")
+                                        line =line.replace("blank"," ")
+                                        sendMessage('test:'+ line,Portindex)
+    #                        sendMessage("image:"+str(base64.b64encode(image.getvalue()))[2:-1])
+    #返回结果
+                            
+    #通过命令行执行lilypond
+                        if(section == '0'):
+                            f = open("a.txt",'w',encoding='utf-8')
+                            print("\score {\\version \"2.14.2\"{"+melody+"}\midi {\context {\ScoretempoWholesPerMinute = #(ly:make-moment 72 4)}}}",file = f)
+                            f.close()
+                            if os.path.exists('a.ly'):
+                                os.remove('a.ly')
+                            os.rename('a.txt','a.ly')
+                            subprocess.run("lilypond a.ly",shell=True)
+    #                    os.system("lilypond a.ly")
+    #在web端载入文件即可
+                        g_code_length = 0
+                        self.length_buffer = 0
+                        self.buffer_utf8 = b""
+                except:
+                    deleteconnection(str(self.index))
+                    self.conn.close()
+                    break
+        print("Dead")
 
 #WebSocket服务器对象()
 class WebSocketServer(object):
@@ -322,6 +339,7 @@ class WebSocketServer(object):
             #更新连接的集合(hash表的对应关系)-name->sockfd
             connectionlist['connection'+str(self.i)]=connection
             self.i += 1
+            
             
 if __name__ == "__main__":
     server = WebSocketServer()

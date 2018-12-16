@@ -199,10 +199,11 @@ var captionstart = 0;
 var inite = 0;
 var seq = "";
 var bias = 0;
+var index = 999;
 function trans(section){
 	captionstart = 1;
 	var msg;
-	if(section == 1)
+	if(section == 1 || select == 3)
 		msg ="";
 	else
 		msg = pictrue;
@@ -210,8 +211,8 @@ function trans(section){
         alert("Message can not be empty"); 
         return;
     }
-    try{ 
-        socket.send("select:"+select+" "+msg);
+    try{
+        socket.send("index:"+index+"!select:"+select+" "+msg);        
     }catch(ex){
        
     }
@@ -226,7 +227,7 @@ function option(selection){
 		$(".notice").addClass("hidden");
 		$(".music").removeClass("hidden");
 		$(".inputbutton").removeClass("hidden");
-		prevDiv.innerHTML = '<div id="output"><span class = "glyphicon glyphicon-music"></span>Result:</div>';
+		prevDiv.innerHTML = '<div id="output"><span class = "glyphicon glyphicon-music"></span>   Result:</div>';
 		var prevDiv = document.getElementById('preview');
 		prevDiv.innerHTML = '<img src="" id="flower" class="demo092 spotlight"/>';
 
@@ -239,7 +240,7 @@ function option(selection){
 		$(".notice").addClass("hidden");
 		$(".music").addClass("hidden");
 		$(".inputbutton").removeClass("hidden");
-		prevDiv.innerHTML = '<div id="output"><span class = "glyphicon glyphicon-pencil"></span>Result:</div>';
+		prevDiv.innerHTML = '<div id="output"><span class = "glyphicon glyphicon-pencil"></span>   Result:</div>';
 		var prevDiv = document.getElementById('preview');
 		prevDiv.innerHTML = '<img src="" id="flower" class="demo092 spotlight"/>';
 
@@ -325,7 +326,7 @@ $(document).ready(function(){
         socket.onmessage = function(msg){ 
             console.log(msg);
             var radium = 0;
-            if(select == 0){
+            if(select == 0||select == 3){
             	rbias = 2;
             	radium = 50;
             	xbias = 220
@@ -338,6 +339,7 @@ $(document).ready(function(){
             }
             label = msg.data.split(':')[0];
             data = msg.data.split(':')[1];
+        
             if (label == 'test'){
         		$('#msg').html(data);
         		captionstart = 0;
@@ -362,6 +364,13 @@ $(document).ready(function(){
 						$('#msg').html(seq);
 						}
             	}
+            else if(label =='index'){
+            	index = data;
+ 
+            }
+            else if(label == 'error'){
+            	alert("«ÎÀ¢–¬÷ÿ ‘");
+            }
             
         };
         socket.onclose   = function(msg){ console.log("close Sucess"); };
