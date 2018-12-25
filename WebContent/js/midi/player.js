@@ -108,6 +108,7 @@ midi.setAnimation = function(callback) {
 
 midi.loadMidiFile = function(onsuccess, onprogress, onerror) {
 	try {
+
 		midi.replayer = new Replayer(MidiFile(midi.currentData), midi.timeWarp, null, midi.BPM);
 		midi.data = midi.replayer.getData();
 		midi.endTime = getLength();
@@ -124,12 +125,14 @@ midi.loadMidiFile = function(onsuccess, onprogress, onerror) {
 };
 
 midi.loadFile = function(file, onsuccess, onprogress, onerror) {
+
 	midi.stop();
 	if (file.indexOf('base64,') !== -1) {
 		var data = window.atob(file.split(',')[1]);
 		midi.currentData = data;
 		midi.loadMidiFile(onsuccess, onprogress, onerror);
 	} else {
+
 		var fetch = new XMLHttpRequest();
 		fetch.open('GET', file);
 		fetch.overrideMimeType('text/plain; charset=x-user-defined');
@@ -146,6 +149,7 @@ midi.loadFile = function(file, onsuccess, onprogress, onerror) {
 					///
 					var data = ff.join('');
 					midi.currentData = data;
+
 					midi.loadMidiFile(onsuccess, onprogress, onerror);
 				} else {
 					onerror && onerror('Unable to load MIDI file');

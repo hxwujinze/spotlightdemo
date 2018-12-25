@@ -9,9 +9,10 @@ import time
 import sys
 from collections import defaultdict, deque
 
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+#use_cuda = torch.cuda.is_available()
+use_cuda = False
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 def normalize(x):
     if x.size(0) <= 1:
